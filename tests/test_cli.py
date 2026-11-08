@@ -3,14 +3,14 @@ import sys
 from pathlib import Path
 
 
-def run_cli(*args, db_path: str = None):
+def run_cli(*args, db_path: str | None = None):
     """Helper to run main.py via subprocess."""
     repo_root = Path(__file__).resolve().parent.parent
     cmd = [sys.executable, str(repo_root / "main.py")]
     if db_path:
         cmd.extend(["--db", db_path])
     cmd.extend(args)
-    res = subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True)
+    res = subprocess.run(cmd, check=False, cwd=repo_root, capture_output=True, text=True)
     return res
 
 

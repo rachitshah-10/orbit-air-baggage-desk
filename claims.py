@@ -1,3 +1,4 @@
+import csv
 import datetime
 import sqlite3
 
@@ -295,3 +296,56 @@ def list_claims(
     query += " ORDER BY id ASC"
     cursor = conn.execute(query, params)
     return [dict(row) for row in cursor.fetchall()]
+
+
+# STRETCH GOAL 2
+def get_tier_report(
+    conn: sqlite3.Connection,
+    now: datetime.datetime | str,
+) -> dict[str, dict[str, int]]:
+    """Generate counts of open and overdue claims grouped by loyalty tier."""
+    current_dt = _parse_time(now)
+    cursor = conn.execute("SELECT * FROM claims ORDER BY id ASC")
+    claims = [dict(row) for row in cursor.fetchall()]
+
+    report = {
+        "gold": {"open": 0, "overdue": 0, "total": 0},
+        "silver": {"open": 0, "overdue": 0, "total": 0},
+        "standard": {"open": 0, "overdue": 0, "total": 0},
+    }
+
+    for c in claims:
+        tier = c["tier"]
+        if tier in report:
+            report[tier]["total"] += 1
+            if c["status"] in ("open", "assigned"):
+                report[tier]["open"] += 1
+                if is_overdue(c, current_dt):
+                    report[tier]["overdue"] += 1
+
+    return report
+
+
+def seed_claims_from_csv(
+    conn: sqlite3.Connection,
+    csv_path: str,
+    now: datetime.datetime | str = ...,
+) -> int:
+    """Load claims from a CSV file into the database using file_claim."""
+    count = 0
+    with open(csv_path, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            file_claim(
+                conn=conn,
+                passenger=row["passenger"],
+                flight=row["flight"],
+                claim_type=row["type"],
+                tier=row["tier"],
+                note=row.get("note", ""),
+                now=now,
+                changed_by="seed",
+            )
+            count += 1
+    return count
+

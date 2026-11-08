@@ -16,6 +16,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-test-edits.sh"
+          }
+        ]
+      }
     ]
   }
 }
