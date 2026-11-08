@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(**/.env*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pytest || exit 2"
+          }
+        ]
+      }
+    ]
+  }
+}

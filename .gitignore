@@ -1,0 +1,21 @@
+# Python virtual environment
+.venv/
+
+# Environment variables & secrets (MUST NEVER BE COMMITTED)
+.env
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Claude local overrides
+CLAUDE.local.md
+
+# Testing & linting artifacts
+.pytest_cache/
+.ruff_cache/
