@@ -1,9 +1,10 @@
 import datetime
 import sqlite3
+
 import pytest
 
+from claims import file_claim, get_claim, get_claim_history, list_claims
 from db import init_db
-from claims import file_claim, list_claims, get_claim, get_claim_history
 
 
 @pytest.fixture
