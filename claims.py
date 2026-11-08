@@ -29,6 +29,17 @@ def _parse_time(now: datetime.datetime | str) -> datetime.datetime:
     raise ValueError("Current time must be provided as a datetime object or an ISO string.")
 
 
+def is_overdue(claim: dict, now: datetime.datetime | str) -> bool:
+    """Check whether a claim is strictly overdue relative to the given timestamp.
+
+    A claim is overdue strictly when current_time > deadline.
+    At exactly the deadline, it is NOT overdue.
+    """
+    deadline_dt = _parse_time(claim["deadline"])
+    current_dt = _parse_time(now)
+    return current_dt > deadline_dt
+
+
 def file_claim(
     conn: sqlite3.Connection,
     passenger: str,
@@ -208,6 +219,45 @@ def close_claim(
             """,
             (claim_id, old_status, changer, current_iso),
         )
+
+
+def escalate_overdue_claims(
+    conn: sqlite3.Connection,
+    now: datetime.datetime | str = ...,
+    changed_by: str = "system",
+) -> list[int]:
+    """Escalate every overdue open or assigned claim and return their IDs."""
+    if now is ... or now is None:
+        raise ValueError("A timestamp ('now') must be explicitly provided.")
+
+    current_dt = _parse_time(now)
+    current_iso = current_dt.isoformat()
+
+    cursor = conn.execute(
+        "SELECT * FROM claims WHERE status IN ('open', 'assigned') ORDER BY id ASC"
+    )
+    candidates = [dict(row) for row in cursor.fetchall()]
+
+    escalated_ids: list[int] = []
+    for claim in candidates:
+        if is_overdue(claim, current_dt):
+            claim_id = claim["id"]
+            old_status = claim["status"]
+            with conn:
+                conn.execute(
+                    "UPDATE claims SET status = 'escalated' WHERE id = ?",
+                    (claim_id,),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO history (claim_id, old_status, new_status, changed_by, changed_at)
+                    VALUES (?, ?, 'escalated', ?, ?)
+                    """,
+                    (claim_id, old_status, changed_by, current_iso),
+                )
+            escalated_ids.append(claim_id)
+
+    return escalated_ids
 
 
 def get_claim(conn: sqlite3.Connection, claim_id: int) -> dict | None:

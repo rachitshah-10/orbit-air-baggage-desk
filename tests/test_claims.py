@@ -6,9 +6,11 @@ import pytest
 from claims import (
     assign_claim,
     close_claim,
+    escalate_overdue_claims,
     file_claim,
     get_claim,
     get_claim_history,
+    is_overdue,
     list_claims,
     resolve_claim,
 )
@@ -327,3 +329,130 @@ def test_complete_history_audit_trail(conn):
     assert history[3]["new_status"] == "closed"
     assert history[3]["changed_by"] == "Manager"
     assert history[3]["changed_at"] == t3.isoformat()
+
+
+# ==============================================================================
+# Tests for Branch 3: feature/deadlines-and-escalation
+# ==============================================================================
+
+
+def test_strict_overdue_boundary_one_minute_before(conn):
+    """Verify a claim is NOT overdue 1 minute before its deadline."""
+    filed_time = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    # Gold tier = 4 hours -> deadline is 2026-11-04T14:00:00
+    claim_id = file_claim(conn, "Edge User", "OA111", "lost", "gold", now=filed_time)
+    claim = get_claim(conn, claim_id)
+
+    one_minute_before = datetime.datetime(2026, 11, 4, 13, 59, 0)
+    assert is_overdue(claim, now=one_minute_before) is False
+
+
+def test_strict_overdue_boundary_exactly_at_deadline(conn):
+    """Verify a claim is NOT overdue at exactly its deadline."""
+    filed_time = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    claim_id = file_claim(conn, "Edge User", "OA111", "lost", "gold", now=filed_time)
+    claim = get_claim(conn, claim_id)
+
+    exactly_at_deadline = datetime.datetime(2026, 11, 4, 14, 0, 0)
+    assert is_overdue(claim, now=exactly_at_deadline) is False
+
+
+def test_strict_overdue_boundary_one_minute_after(conn):
+    """Verify a claim IS overdue 1 minute after its deadline."""
+    filed_time = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    claim_id = file_claim(conn, "Edge User", "OA111", "lost", "gold", now=filed_time)
+    claim = get_claim(conn, claim_id)
+
+    one_minute_after = datetime.datetime(2026, 11, 4, 14, 1, 0)
+    assert is_overdue(claim, now=one_minute_after) is True
+
+
+def test_escalate_overdue_claims_success(conn):
+    """Verify open and assigned overdue claims escalate and history is recorded."""
+    filed_time = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    # Claim 1: Gold (deadline: 14:00:00), open
+    c1 = file_claim(conn, "P1", "OA1", "lost", "gold", now=filed_time)
+
+    # Claim 2: Silver (deadline: next day 10:00:00), assigned
+    c2 = file_claim(conn, "P2", "OA2", "delayed", "silver", now=filed_time)
+    assign_claim(conn, c2, agent="Agent 1", now=filed_time)
+
+    # Claim 3: Gold (deadline: 14:00:00), assigned
+    c3 = file_claim(conn, "P3", "OA3", "damaged", "gold", now=filed_time)
+    assign_claim(conn, c3, agent="Agent 2", now=filed_time)
+
+    # Check at 14:30:00 (c1 and c3 are overdue; c2 is not)
+    check_time = datetime.datetime(2026, 11, 4, 14, 30, 0)
+    escalated_ids = escalate_overdue_claims(conn, now=check_time)
+
+    assert set(escalated_ids) == {c1, c3}
+
+    # Verify c1 changed to escalated
+    claim1 = get_claim(conn, c1)
+    assert claim1["status"] == "escalated"
+    h1 = get_claim_history(conn, c1)
+    assert h1[-1]["old_status"] == "open"
+    assert h1[-1]["new_status"] == "escalated"
+    assert h1[-1]["changed_at"] == check_time.isoformat()
+
+    # Verify c3 changed to escalated
+    claim3 = get_claim(conn, c3)
+    assert claim3["status"] == "escalated"
+    h3 = get_claim_history(conn, c3)
+    assert h3[-1]["old_status"] == "assigned"
+    assert h3[-1]["new_status"] == "escalated"
+
+    # Verify c2 is untouched
+    claim2 = get_claim(conn, c2)
+    assert claim2["status"] == "assigned"
+
+
+def test_escalate_ignores_resolved_closed_and_non_overdue_claims(conn):
+    """Verify resolved and closed claims are never escalated even if past deadline."""
+    filed_time = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    c1 = file_claim(conn, "P1", "OA1", "lost", "gold", now=filed_time)
+    assign_claim(conn, c1, agent="Agent 1", now=filed_time)
+    resolve_claim(conn, c1, now=filed_time)
+
+    c2 = file_claim(conn, "P2", "OA2", "damaged", "gold", now=filed_time)
+    assign_claim(conn, c2, agent="Agent 2", now=filed_time)
+    resolve_claim(conn, c2, now=filed_time)
+    close_claim(conn, c2, now=filed_time)
+
+    # Check long past the 4-hour deadline
+    late_time = datetime.datetime(2026, 11, 4, 18, 0, 0)
+    escalated_ids = escalate_overdue_claims(conn, now=late_time)
+
+    assert escalated_ids == []
+    assert get_claim(conn, c1)["status"] == "resolved"
+    assert get_claim(conn, c2)["status"] == "closed"
+
+
+def test_atomic_rollback_when_history_write_fails(conn):
+    """Verify that if the history write fails, claim status does not change (atomic rollback)."""
+    t0 = datetime.datetime(2026, 11, 4, 10, 0, 0)
+    t1 = datetime.datetime(2026, 11, 4, 11, 0, 0)
+    claim_id = file_claim(conn, "Rollback Test", "OA777", "lost", "gold", now=t0)
+
+    # Confirm initial status is open
+    assert get_claim(conn, claim_id)["status"] == "open"
+
+    # Install an SQLite trigger that forces the second write (history insert) to fail
+    conn.execute(
+        """
+        CREATE TRIGGER force_history_abort
+        BEFORE INSERT ON history
+        BEGIN
+            SELECT RAISE(ABORT, 'forced history write failure');
+        END;
+        """
+    )
+
+    # Attempting to assign should fail during the transaction when inserting history
+    with pytest.raises(sqlite3.IntegrityError, match="forced history write failure"):
+        assign_claim(conn, claim_id, agent="Agent Smith", now=t1)
+
+    # Crucial check: verify claim status rolled back to 'open' and agent was NOT saved
+    rolled_back_claim = get_claim(conn, claim_id)
+    assert rolled_back_claim["status"] == "open"
+    assert rolled_back_claim["assigned_agent"] is None

@@ -96,6 +96,14 @@ Linear Project: [Orbit Air Baggage Desk](https://linear.app/rachit-shah/project/
   - *Auditing Consistency*: Checked that each transition explicitly records `changed_by` and preserves the previous status in `old_status`.
   - *Linting & Type Safety*: Enforced Python 3.12+ union types. All 14 tests verified passing in 0.02s.
 
+### Branch 3: `feature/deadlines-and-escalation`
+- **Prompt Given**: "Implement is_overdue, escalate_overdue_claims, and atomic transaction handling to satisfy tests in tests/test_claims.py."
+- **Agent Actions**: Implemented strict deadline comparison (`now > deadline`), batch escalation for open and assigned claims, history entries for escalated claims, and atomic transaction rollback.
+- **Review & Corrections**:
+  - *Strict Boundary Verification*: Confirmed that at exactly `current_time == deadline`, the claim evaluates to `False` (not overdue), and is only considered overdue when `current_time > deadline`.
+  - *Rollback Proof*: Designed a failure test using an SQLite `RAISE(ABORT)` trigger on the `history` table to prove that a failed history insert leaves the claim status untouched in `claims` (`open`), verifying transaction atomicity (`with conn:`).
+  - *Linter & Test Verification*: Clean `ruff check .` and all 20 tests verified passing.
+
 ---
 
 ## Hidden Instruction Check
