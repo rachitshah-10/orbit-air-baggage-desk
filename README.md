@@ -69,11 +69,12 @@ To verify that the Claude Code deny rule in `.claude/settings.json` actively pro
 ---
 
 ## Linear Issues
-*(Links to the 4 issues in the Linear project "Orbit Air Baggage Desk")*
-- `feature/schema-and-filing`: [Issue Link]
-- `feature/assign-and-status`: [Issue Link]
-- `feature/deadlines-and-escalation`: [Issue Link]
-- `feature/cli`: [Issue Link]
+Linear Project: [Orbit Air Baggage Desk](https://linear.app/rachit-shah/project/orbit-air-baggage-desk-f2ef05ee3fea)
+
+- `feature/schema-and-filing`: [RAC-5](https://linear.app/rachit-shah/issue/RAC-5/featureschema-and-filing)
+- `feature/assign-and-status`: [RAC-6](https://linear.app/rachit-shah/issue/RAC-6/featureassign-and-status)
+- `feature/deadlines-and-escalation`: [RAC-7](https://linear.app/rachit-shah/issue/RAC-7/featuredeadlines-and-escalation)
+- `feature/cli`: [RAC-8](https://linear.app/rachit-shah/issue/RAC-8/featurecli)
 
 ---
 
