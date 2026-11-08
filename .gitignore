@@ -19,3 +19,9 @@ CLAUDE.local.md
 # Testing & linting artifacts
 .pytest_cache/
 .ruff_cache/
+
+# Local MCP and editor configs (contain API keys)
+.mcp.json
+.cursor/
+.agents/
+
