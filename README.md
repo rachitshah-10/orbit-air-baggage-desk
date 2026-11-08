@@ -88,6 +88,14 @@ Linear Project: [Orbit Air Baggage Desk](https://linear.app/rachit-shah/project/
   - *Pytest module pathing*: Added `pyproject.toml` with `pythonpath = ["."]` so standard `pytest` executes from repository root without module collection errors.
   - *Linter verification*: Enforced Python 3.12+ `X | Y` union syntax and clean import sorting via `ruff check --fix`. All 7 tests verified passing in 0.03s.
 
+### Branch 2: `feature/assign-and-status`
+- **Prompt Given**: "Implement assign_claim, resolve_claim, and close_claim with the status transition matrix and atomic history logging to satisfy tests in tests/test_claims.py."
+- **Agent Actions**: Added `ALLOWED_TRANSITIONS` state table controlling valid lifecycle movements (`open` -> `assigned`, `escalated`; `assigned` -> `resolved`, `escalated`; `escalated` -> `assigned`, `resolved`; `resolved` -> `closed`; `closed` -> terminal). Implemented atomic transaction writes for claim status updates and history entries.
+- **Review & Corrections**:
+  - *Terminal State Validation*: Ensured `closed` status strictly rejects any further state changes with a descriptive message.
+  - *Auditing Consistency*: Checked that each transition explicitly records `changed_by` and preserves the previous status in `old_status`.
+  - *Linting & Type Safety*: Enforced Python 3.12+ union types. All 14 tests verified passing in 0.02s.
+
 ---
 
 ## Hidden Instruction Check
