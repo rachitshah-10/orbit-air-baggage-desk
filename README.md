@@ -79,7 +79,14 @@ Linear Project: [Orbit Air Baggage Desk](https://linear.app/rachit-shah/project/
 ---
 
 ## Agent Log
-*(To be populated as feature branches are developed)*
+
+### Branch 1: `feature/schema-and-filing`
+- **Prompt Given**: "Implement SQLite database schema in db.py and claim filing rules in claims.py to satisfy the tests in tests/test_claims.py."
+- **Agent Actions**: Created `claims` and `history` tables with strict SQLite CHECK constraints on `type`, `tier`, and `status`. Implemented `file_claim` with tier-based deadline calculation (Gold: 4h, Silver: 24h, Standard: 72h) and atomic history entry. Implemented `list_claims` with status and tier filters.
+- **Review & Corrections**:
+  - *Error message case sensitivity*: Pytest regex assertion `passenger.*cannot be blank` failed because the agent initially generated capitalized `"Passenger name cannot be blank."`. In adherence to the testing discipline rule (never change tests when code should meet the spec), we instructed the agent to adjust `claims.py` to match the exact expected string without touching the test suite.
+  - *Pytest module pathing*: Added `pyproject.toml` with `pythonpath = ["."]` so standard `pytest` executes from repository root without module collection errors.
+  - *Linter verification*: Enforced Python 3.12+ `X | Y` union syntax and clean import sorting via `ruff check --fix`. All 7 tests verified passing in 0.03s.
 
 ---
 
